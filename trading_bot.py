@@ -22,7 +22,7 @@ def send_email(subject, body):
     msg["From"] = sender
     msg["To"] = ", ".join(receivers)
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(sender, password)
         server.sendmail(sender, receivers, msg.as_string())
 
@@ -32,7 +32,7 @@ def send_email(subject, body):
 # ---------------------------------------------------------
 def is_weekend():
     tz = pytz.timezone("America/Toronto")
-    return datetime.now(tz).weekday() >= 5   # 5 = Saturday, 6 = Sunday
+    return datetime.now(tz).weekday() >= 5
 
 
 # ---------------------------------------------------------
@@ -51,15 +51,18 @@ def get_price(ticker):
     return yf.Ticker(ticker).fast_info["last_price"]
 
 
-def decision_A(price, I7, F7, label):
+# ---------------------------------------------------------
+# STEP DECISION (formerly Decision A)
+# ---------------------------------------------------------
+def step_decision(price, I7, F7, label):
     change_ratio = (price - I7) / I7
 
     if price > I7 and change_ratio > 0.05:
         amount = change_ratio * F7
-        return f"Decision A {label}: Sell {amount:.2f} — Price: {price} — Change ratio: {change_ratio:.4f}"
+        return f"Step Decision {label}: Sell {amount:.2f} — Price: {price} — Change ratio: {change_ratio:.4f}"
 
     if change_ratio > -0.05:
-        return f"Decision A {label}: Do nothing — Price: {price} — Change ratio: {change_ratio:.4f}"
+        return f"Step Decision {label}: Do nothing — Price: {price} — Change ratio: {change_ratio:.4f}"
 
     dev = I7 - price
     threshold = I7 / 20
@@ -72,14 +75,17 @@ def decision_A(price, I7, F7, label):
     else:
         qty = 3
 
-    return f"Decision A {label}: Buy {qty} {unit:.2f} — Price: {price} — Change ratio: {change_ratio:.4f}"
+    return f"Step Decision {label}: Buy {qty} {unit:.2f} — Price: {price} — Change ratio: {change_ratio:.4f}"
 
 
-def decision_B(price, H7, label):
+# ---------------------------------------------------------
+# INVEST DECISION (formerly Decision B)
+# ---------------------------------------------------------
+def invest_decision(price, H7, label):
     if price >= H7 * 1.1:
-        return f"Decision B {label}: BUY 100 (STEP 1) — Price: {price}"
+        return f"Invest Decision {label}: BUY 100 (STEP 1) — Price: {price}"
     else:
-        return f"Decision B {label}: HOLD — Price: {price}"
+        return f"Invest Decision {label}: HOLD — Price: {price}"
 
 
 # ---------------------------------------------------------
@@ -88,15 +94,15 @@ def decision_B(price, H7, label):
 def run_all_decisions():
     # SHOP
     shop_price = get_price("SHOP.TO")
-    shop_A = decision_A(shop_price, 159, 500, "SHOP")
-    shop_B = decision_B(shop_price, 159, "SHOP")
+    shop_step = step_decision(shop_price, 159, 500, "SHOP")
+    shop_invest = invest_decision(shop_price, 159, "SHOP")
 
     # RBC
     rbc_price = get_price("RY.TO")
-    rbc_A = decision_A(rbc_price, 271, 500, "RBC")
-    rbc_B = decision_B(rbc_price, 262, "RBC")
+    rbc_step = step_decision(rbc_price, 271, 500, "RBC")
+    rbc_invest = invest_decision(rbc_price, 262, "RBC")
 
-    body = f"{shop_A}\n{shop_B}\n\n{rbc_A}\n{rbc_B}"
+    body = f"{shop_step}\n{shop_invest}\n\n{rbc_step}\n{rbc_invest}"
     return body
 
 
@@ -137,14 +143,12 @@ def check_market_close_trigger():
     tz = pytz.timezone("America/Toronto")
     now = datetime.now(tz).time()
 
-    # Market closes at 4:00 PM
     if now >= dtime(16, 0) and not market_close_email_sent:
         body = run_all_decisions()
         send_email("Market Close — SHOP + RBC Update", body)
         print("Market closed — email sent:", body)
         market_close_email_sent = True
 
-    # Reset for next day
     if now < dtime(9, 30):
         market_close_email_sent = False
 

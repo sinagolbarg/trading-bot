@@ -28,6 +28,14 @@ def send_email(subject, body):
 
 
 # ---------------------------------------------------------
+# WEEKEND CHECK
+# ---------------------------------------------------------
+def is_weekend():
+    tz = pytz.timezone("America/Toronto")
+    return datetime.now(tz).weekday() >= 5   # 5 = Saturday, 6 = Sunday
+
+
+# ---------------------------------------------------------
 # MARKET HOURS CHECK (TSX)
 # ---------------------------------------------------------
 def market_is_open():
@@ -37,7 +45,7 @@ def market_is_open():
 
 
 # ---------------------------------------------------------
-# STOCK MODULE (Reusable for SHOP + RBC)
+# STOCK MODULE
 # ---------------------------------------------------------
 def get_price(ticker):
     return yf.Ticker(ticker).fast_info["last_price"]
@@ -100,6 +108,10 @@ market_open_email_sent = False
 def check_market_open_trigger():
     global market_open_email_sent
 
+    if is_weekend():
+        market_open_email_sent = False
+        return
+
     if market_is_open() and not market_open_email_sent:
         body = run_all_decisions()
         send_email("Market Open — SHOP + RBC Update", body)
@@ -111,9 +123,40 @@ def check_market_open_trigger():
 
 
 # ---------------------------------------------------------
-# SCHEDULED JOB
+# MARKET CLOSE TRIGGER
+# ---------------------------------------------------------
+market_close_email_sent = False
+
+def check_market_close_trigger():
+    global market_close_email_sent
+
+    if is_weekend():
+        market_close_email_sent = False
+        return
+
+    tz = pytz.timezone("America/Toronto")
+    now = datetime.now(tz).time()
+
+    # Market closes at 4:00 PM
+    if now >= dtime(16, 0) and not market_close_email_sent:
+        body = run_all_decisions()
+        send_email("Market Close — SHOP + RBC Update", body)
+        print("Market closed — email sent:", body)
+        market_close_email_sent = True
+
+    # Reset for next day
+    if now < dtime(9, 30):
+        market_close_email_sent = False
+
+
+# ---------------------------------------------------------
+# SCHEDULED JOB (EVERY 2 HOURS)
 # ---------------------------------------------------------
 def job():
+    if is_weekend():
+        print("Weekend — skipping scheduled job")
+        return
+
     if market_is_open():
         body = run_all_decisions()
         send_email("Scheduled Update — SHOP + RBC", body)
@@ -126,10 +169,12 @@ schedule.every(2).hours.do(job)
 
 print("Bot started. Running every 2 hours...")
 
+
 # ---------------------------------------------------------
 # MAIN LOOP
 # ---------------------------------------------------------
 while True:
     check_market_open_trigger()
+    check_market_close_trigger()
     schedule.run_pending()
     time.sleep(1)

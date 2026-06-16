@@ -22,7 +22,7 @@ def send_email(subject, body):
     msg["From"] = sender
     msg["To"] = ", ".join(receivers)
 
-    with smtplplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(sender, password)
         server.sendmail(sender, receivers, msg.as_string())
 
@@ -52,7 +52,7 @@ def get_price(ticker):
 
 
 # ---------------------------------------------------------
-# STEP DECISION (formerly Decision A)
+# STEP DECISION
 # ---------------------------------------------------------
 def step_decision(price, I7, F7, label):
     change_ratio = (price - I7) / I7
@@ -79,7 +79,7 @@ def step_decision(price, I7, F7, label):
 
 
 # ---------------------------------------------------------
-# INVEST DECISION (formerly Decision B)
+# INVEST DECISION
 # ---------------------------------------------------------
 def invest_decision(price, H7, label):
     if price >= H7 * 1.1:
@@ -104,6 +104,34 @@ def run_all_decisions():
 
     body = f"{shop_step}\n{shop_invest}\n\n{rbc_step}\n{rbc_invest}"
     return body
+
+
+# ---------------------------------------------------------
+# DAILY SUMMARY BODY (NEW)
+# ---------------------------------------------------------
+def daily_summary_body():
+    tz = pytz.timezone("America/Toronto")
+    today = datetime.now(tz).strftime("%Y-%m-%d")
+
+    shop_price = get_price("SHOP.TO")
+    rbc_price = get_price("RY.TO")
+
+    shop_change = round((shop_price - 159) / 159 * 100, 2)
+    rbc_change = round((rbc_price - 271) / 271 * 100, 2)
+
+    return f"""
+📊 DAILY SUMMARY — {today}
+
+SHOP.TO closing price: {shop_price}
+RBC.TO closing price:  {rbc_price}
+
+Performance vs initial:
+- SHOP: {shop_change}%
+- RBC:  {rbc_change}%
+
+Decisions:
+{run_all_decisions()}
+"""
 
 
 # ---------------------------------------------------------
@@ -154,6 +182,33 @@ def check_market_close_trigger():
 
 
 # ---------------------------------------------------------
+# DAILY SUMMARY TRIGGER (NEW)
+# ---------------------------------------------------------
+daily_summary_sent = False
+
+def check_daily_summary_trigger():
+    global daily_summary_sent
+
+    if is_weekend():
+        daily_summary_sent = False
+        return
+
+    tz = pytz.timezone("America/Toronto")
+    now = datetime.now(tz).time()
+
+    # 4:10 PM to 4:15 PM window
+    if dtime(16, 10) <= now <= dtime(16, 15) and not daily_summary_sent:
+        body = daily_summary_body()
+        send_email("Daily Summary — SHOP + RBC", body)
+        print("Daily summary email sent:", body)
+        daily_summary_sent = True
+
+    # Reset next morning
+    if now < dtime(9, 30):
+        daily_summary_sent = False
+
+
+# ---------------------------------------------------------
 # SCHEDULED JOB (EVERY 2 HOURS)
 # ---------------------------------------------------------
 def job():
@@ -180,5 +235,6 @@ print("Bot started. Running every 2 hours...")
 while True:
     check_market_open_trigger()
     check_market_close_trigger()
+    check_daily_summary_trigger()   # NEW
     schedule.run_pending()
     time.sleep(1)

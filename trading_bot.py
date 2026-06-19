@@ -69,7 +69,7 @@ def decision_A(price, I7, F7, label):
 
 def decision_B(price, H7, label):
     if price >= H7 * 1.1:
-        return f"Decision B {label}: BUY 100 (STEP 1) — Price: {price}"
+        return f"Decision B_RBC1 step done {label}: BUY 100 (STEP 1) — Price: {price}"
     else:
         return f"Decision B {label}: HOLD — Price: {price}"
 

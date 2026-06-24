@@ -86,8 +86,8 @@ def run_all_decisions():
     shop_B = decision_B(shop_price, initial_buy_price_SHOP, "SHOP")
 
     # RBC
-    new_buy_price_RBC=185
-    initial_buy_price_RBC=162
+    new_buy_price_RBC=287
+    initial_buy_price_RBC=262
     rbc_price = get_price("RY.TO")
     rbc_A = decision_A(rbc_price, new_buy_price_RBC, 500, "RBC")
     rbc_B = decision_B(rbc_price, initial_buy_price_RBC, "RBC")
